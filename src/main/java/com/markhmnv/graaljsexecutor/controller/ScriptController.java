@@ -24,11 +24,6 @@ import java.util.List;
 public class ScriptController {
     private final ScriptService scriptService;
 
-    @GetMapping("/script")
-    public String getScript(){
-        return "script tesedfwfwt ";
-    }
-
     @Operation(summary = "Get a list of available scripts")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successfully retrieved list",
