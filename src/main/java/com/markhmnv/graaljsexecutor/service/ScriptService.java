@@ -11,7 +11,6 @@ import com.markhmnv.graaljsexecutor.model.entity.Script;
 import com.markhmnv.graaljsexecutor.model.enums.ScriptStatus;
 import com.markhmnv.graaljsexecutor.repository.ScriptRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.graalvm.polyglot.Context;
 import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.TaskScheduler;
@@ -28,8 +27,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 
+import static com.markhmnv.graaljsexecutor.model.enums.ScriptStatus.*;
+
 @Service
-@Slf4j
 @RequiredArgsConstructor
 public class ScriptService {
     private final ScriptRepository scriptRepository;
@@ -63,7 +63,7 @@ public class ScriptService {
 
     public void deleteScript(Long id) {
         Script script = getScriptById(id);
-        if(script.getStatus() == ScriptStatus.EXECUTING)
+        if(script.getStatus() == EXECUTING)
             throw new IllegalDeletionException();
         scriptRepository.delete(script);
     }
@@ -84,7 +84,7 @@ public class ScriptService {
                 ? now
                 : executeAt.atZone(zoneId).toInstant();
 
-        ScriptStatus initialStatus = executeAtInstant.isAfter(now) ? ScriptStatus.QUEUED : ScriptStatus.EXECUTING;
+        ScriptStatus initialStatus = executeAtInstant.isAfter(now) ? QUEUED : EXECUTING;
         Script script = createAndSave(scriptRequest, executeAt, initialStatus);
 
         ScheduledFuture<?> scheduledFuture = taskScheduler.schedule(() -> executeScript(script.getId(), scriptRequest), executeAtInstant);
@@ -102,7 +102,7 @@ public class ScriptService {
      */
     private void executeScript(Long id, String body){
         Script script = getScriptById(id);
-        script.setStatus(ScriptStatus.EXECUTING);
+        script.setStatus(EXECUTING);
         scriptRepository.save(script);
 
         long startTime = System.currentTimeMillis();
@@ -115,13 +115,11 @@ public class ScriptService {
             long executionTime = System.currentTimeMillis() - startTime;
             String output = outputStream.toString(StandardCharsets.UTF_8);
 
-            updateAndSaveScript(script, executionTime, output, ScriptStatus.COMPLETED);
-            scriptMapper.toScriptFullInfo(script);
+            updateAndSaveScript(script, executionTime, output, COMPLETED);
         } catch (Exception e){
             String message = e.getMessage();
             long executionTime = System.currentTimeMillis() - startTime;
-            updateAndSaveScript(script, executionTime, message, ScriptStatus.FAILED);
-            log.error(message);
+            updateAndSaveScript(script, executionTime, message, FAILED);
             throw new EvaluationException(message);
         } finally {
             runningScripts.remove(id);
@@ -130,7 +128,7 @@ public class ScriptService {
 
     public void stopScript(Long id) {
         Script script = getScriptById(id);
-        if(script.getStatus() != ScriptStatus.EXECUTING && script.getStatus() != ScriptStatus.QUEUED)
+        if(script.getStatus() != EXECUTING && script.getStatus() != QUEUED)
             throw new ScriptExecutionStopException();
 
         ScheduledFuture<?> future = runningScripts.remove(id);
